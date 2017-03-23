@@ -46,6 +46,7 @@ int main (int argc, char* argv[]){
 
     
 //    buf_size = nodecount / npes;
+    // Only measure the time using the first process
     if (myrank == 0)
     GET_TIME(start);
     // CORE CALCULATION
@@ -55,6 +56,7 @@ int main (int argc, char* argv[]){
         vec_cp(r, r_pre, nodecount);
         for ( i = 0; i < nodecount; ++i){
 //	    if ( i >= buf_size * myrank && i < buf_size * (myrank+1)) {
+            // Each process calculate a portion of the interative updates
 	    if ( i % npes == myrank) {
                 r[i] = 0;
                 for ( j = 0; j < nodehead[i].num_in_links; ++j)
@@ -63,10 +65,12 @@ int main (int argc, char* argv[]){
                 r[i] += damp_const;
 		buf[i] = r[i];
 	    }
+            // For the rest values, just leave it as 0
 	    else {
 		buf[i] = 0;
 	    }
         }
+        // After all the calculations are done, call MPI_Allreduce to put each portion of calculation into buffer "r"
 	MPI_Allreduce(buf, r, nodecount, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
     }while(rel_error(r, r_pre, nodecount) >= EPSILON);
     //printf("Program converges at %d th iteration.\n", iterationcount);
