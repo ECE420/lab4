@@ -17,11 +17,6 @@ int main (int argc, char* argv[]){
     double *r, *r_pre;
     int i, j;
     double damp_const;
-    int iterationcount = 0;
-    int collected_nodecount;
-    double *collected_r;
-    double error;
-    FILE *fp;
     int npes, myrank;
     double *buf;
     double start, end;
@@ -51,31 +46,28 @@ int main (int argc, char* argv[]){
         GET_TIME(start);
     // CORE CALCULATION
     do{
-	buf_i = 0;
-        ++iterationcount;
+        buf_i = 0;
         vec_cp(r, r_pre, nodecount);
         for ( i = 0; i < nodecount; ++i){
             // Each process calculate a portion of the interative updates
-	    if ( i >= buf_size * myrank && i < buf_size * (myrank+1)) {
-//	    if ( i % npes == myrank) {
+    	    if ( i >= buf_size * myrank && i < buf_size * (myrank+1)) {
                 r[i] = 0;
                 for ( j = 0; j < nodehead[i].num_in_links; ++j)
                     r[i] += r_pre[nodehead[i].inlinks[j]] / num_out_links[nodehead[i].inlinks[j]];
                 r[i] *= DAMPING_FACTOR;
                 r[i] += damp_const;
-		buf[buf_i++] = r[i];
-	    }
+        		buf[buf_i++] = r[i];
+            }
         }
-        // After all the calculations are done, call MPI_Allgather to put each portion of calculation into buffer "r"
-	MPI_Gather(buf,buf_size,MPI_DOUBLE,r,buf_size,MPI_DOUBLE,0,MPI_COMM_WORLD);
-	MPI_Bcast(r, nodecount, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+        // Use allgather to generate the result array by concat all subarrays from processes
+	    MPI_Allgather(buf, buf_size, MPI_DOUBLE, r, buf_size, MPI_DOUBLE, MPI_COMM_WORLD);
     }while(rel_error(r, r_pre, nodecount) >= EPSILON);
 
     if (myrank == 0)
         GET_TIME(end);
 
     if (myrank == 0)
-	Lab4_saveoutput(r, nodecount, end-start);
+	    Lab4_saveoutput(r, nodecount, end-start);
 
     MPI_Finalize();
     // post processing
